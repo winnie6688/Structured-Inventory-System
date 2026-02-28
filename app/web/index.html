@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>图片结构化解析平台</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <div class="bg-shape bg-shape-a"></div>
+    <div class="bg-shape bg-shape-b"></div>
+
+    <main class="page">
+      <section class="hero">
+        <h1>图片结构化解析平台</h1>
+        <p class="subtitle">批量上传图片，按业务规则解析并写入飞书多维表格，实时返回任务结果。</p>
+      </section>
+
+      <section class="panel uploader-panel">
+        <form id="upload-form">
+          <div class="field-group">
+            <label for="files">上传图片（可多选）</label>
+            <div class="file-input-wrapper">
+              <button type="button" id="custom-file-btn" class="secondary">上传</button>
+              <input id="files" name="files" type="file" accept="image/*" multiple style="display: none;" />
+              <span id="file-hint" class="hint">尚未选择文件</span>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label class="toggle-wrap" for="dry-run">
+              <input id="dry-run" name="dry_run" type="checkbox" />
+              <span>仅解析</span>
+            </label>
+          </div>
+
+          <div class="field-group">
+            <label for="manual-records-json">手动输入记录（可选，联调用）</label>
+            <textarea id="manual-records-json" name="manual_records_json" rows="6" placeholder='例如: [{"品类":"女休闲","型号":"6872-66","颜色":"米","尺码":"9","数量":1,"作废":false,"性别":"女"}]'></textarea>
+          </div>
+
+          <div class="example-section">
+            <details>
+              <summary>查看示例</summary>
+              <div class="example-grid">
+                <div class="example-block">
+                  <span class="example-label">输入示例 (手写单内容)</span>
+                  <div class="code-block text-content">
+                    6872-66 米色 39,40
+                  </div>
+                </div>
+                <div class="example-block">
+                  <span class="example-label">输出示例 (JSON)</span>
+                  <pre class="code-block"><code>[
+  {
+    "品类": "女休闲",
+    "型号": "6872-66",
+    "颜色": "米色",
+    "尺码": "39",
+    "数量": 1
+  },
+  {
+    "品类": "女休闲",
+    "型号": "6872-66",
+    "颜色": "米色",
+    "尺码": "40",
+    "数量": 1
+  }
+]</code></pre>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div class="rules-section">
+            <h3>业务规则说明</h3>
+            <div class="rules-grid">
+              <div class="rule-item">
+                <span class="rule-label">尺码转换</span>
+                <p>简写自动展开：6→36, 7→37, 8→38, 9→39, 0→40</p>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">颜色修正</span>
+                <p>常用词补全：米→米色, 黑→黑色, 棕→棕色, 卡→卡其, 杏→杏色</p>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">数量识别</span>
+                <p>识别下角标数量；若无标注则默认数量为 1</p>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">合法范围</span>
+                <p>男鞋：38-48 码；女鞋：35-43 码（超出进入待复核）</p>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">作废标记</span>
+                <p>识别 X 或斜杠删除线，作废记录进入待复核</p>
+              </div>
+              <div class="rule-item">
+                <span class="rule-label">自动拆分</span>
+                <p>一行多尺码（如 37, 38）将自动拆分为多条记录</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button id="submit-btn" type="submit">开始处理</button>
+            <button id="reset-btn" type="button" class="secondary">清空</button>
+          </div>
+        </form>
+      </section>
+
+      <section id="status-panel" class="panel status-panel hidden">
+        <h2>任务状态</h2>
+        <p id="status-text"></p>
+      </section>
+
+      <section id="summary-panel" class="panel hidden">
+        <h2>结果总览</h2>
+        <div id="summary-cards" class="summary-grid"></div>
+      </section>
+
+      <section id="tables-panel" class="panel hidden">
+        <div class="table-block">
+          <h3>有效记录</h3>
+          <div class="table-wrap">
+            <table id="valid-table">
+              <thead>
+                <tr>
+                  <th>品类</th>
+                  <th>型号</th>
+                  <th>颜色</th>
+                  <th>尺码</th>
+                  <th>数量</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-block">
+          <h3>待复核记录</h3>
+          <div class="table-wrap">
+            <table id="review-table">
+              <thead>
+                <tr>
+                  <th>品类</th>
+                  <th>型号</th>
+                  <th>颜色</th>
+                  <th>尺码</th>
+                  <th>数量</th>
+                  <th>异常原因</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="table-block">
+          <h3>错误汇总</h3>
+          <div class="table-wrap">
+            <table id="error-table">
+              <thead>
+                <tr>
+                  <th>类型</th>
+                  <th>数量</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div id="parse-error-block" class="table-block hidden">
+          <h3>文件解析失败</h3>
+          <div class="table-wrap">
+            <table id="parse-error-table">
+              <thead>
+                <tr>
+                  <th>文件名</th>
+                  <th>错误信息</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
